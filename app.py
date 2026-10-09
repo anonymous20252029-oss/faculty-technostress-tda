@@ -155,19 +155,35 @@ def get_status_feedback(f1, f2, f3):
         color = "#16a34a"
     return zone, desc, tips, color
 
-# --- 6. SIDEBAR: TẠO LINK & QR NHÓM ---
+# --- 6. SIDEBAR: TẠO LINK & QR NHÓM (LINK ĐẦY ĐỦ TUYỆT ĐỐI) ---
 with st.sidebar:
     st.markdown("### 🔗 Tạo Link & Mã QR Nhóm")
+    st.caption("Dành cho người điều phối tạo link cố định nhóm gửi cho thành viên")
+    
+    # Địa chỉ web gốc chính thức của app
+    BASE_URL = "https://faculty-technostress-tda-mmmrqgaetftbvoqpdigqmm.streamlit.app"
+
     new_group_name = st.text_input("Nhập tên nhóm muốn tạo:", placeholder="Ví dụ: KTPM, KHMT, Nhom_1")
+    
     if new_group_name:
         encoded_grp = urllib.parse.quote(new_group_name.strip())
-        generated_link = f"?group={encoded_grp}"
-        st.success(f"Link nhóm: **{new_group_name}**")
-        st.code(generated_link, language="text")
         
-        qr_bytes = generate_qr_image(generated_link)
-        st.image(qr_bytes, caption=f"Mã QR: {new_group_name}", use_container_width=True)
-        st.download_button("📥 Tải QR về máy", qr_bytes, file_name=f"QR_{new_group_name}.png", mime="image/png")
+        # Tạo link đầy đủ chính xác 100%
+        full_group_url = f"{BASE_URL}/?group={encoded_grp}"
+        
+        st.success(f"Link tham gia nhóm: **{new_group_name}**")
+        st.code(full_group_url, language="text")
+        
+        # Sinh mã QR từ đường link đầy đủ để quét điện thoại mở thẳng web
+        qr_bytes = generate_qr_image(full_group_url)
+        st.image(qr_bytes, caption=f"Mã QR Nhóm: {new_group_name}", use_container_width=True)
+        st.download_button(
+            "📥 Tải QR về máy",
+            qr_bytes,
+            file_name=f"QR_{new_group_name}.png",
+            mime="image/png",
+            use_container_width=True
+        )
 
 # ==============================================================================
 # TRANG 1: PHIẾU KHẢO SÁT
