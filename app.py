@@ -7,25 +7,64 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
-# --- 1. CẤU HÌNH GIAO DIỆN HỆ THỐNG ---
+# --- 1. CẤU HÌNH TRANG VÀ RESPONSIVE CSS ---
 st.set_page_config(
-    page_title="Lắng Nghe Nhịp Độ Nhận Thức & Thích Ứng Công Nghệ",
+    page_title="Khảo Sát & Định Vị Thích Ứng Số",
     page_icon="🌱",
-    layout="wide"
+    layout="centered"  # Giữ giao diện tập trung ở giữa màn hình, không bị loãng trên màn hình lớn
 )
+
+# Nhúng CSS tùy biến để loại bỏ khoảng trắng thừa, tối ưu cho cả mobile & desktop
+st.markdown("""
+<style>
+    /* Giảm padding mặc định của Streamlit */
+    .block-container {
+        padding-top: 1.2rem !important;
+        padding-bottom: 1.5rem !important;
+        padding-left: 1.0rem !important;
+        padding-right: 1.0rem !important;
+        max-width: 860px !important;
+    }
+    /* Ẩn bớt footer và menu mặc định */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Canh chỉnh chữ gọn gàng */
+    h3, h4, h5 {
+        margin-top: 0.2rem !important;
+        margin-bottom: 0.4rem !important;
+    }
+    p, label {
+        font-size: 0.95rem !important;
+        margin-bottom: 0.2rem !important;
+    }
+    .stRadio > div {
+        gap: 0.35rem !important;
+    }
+    /* Khung kết quả bo tròn gọn nhẹ */
+    .result-box {
+        background-color: #f8fafc;
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 12px;
+        border: 1px solid #e2e8f0;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 DATA_GLOBAL_PATH = "data/global_aligned_real_dataset.csv"
 DATA_RESPONSES_PATH = "data/pilot_survey_cntt_30_responses.csv"
 
-# Quản lý trạng thái chuyển trang và lưu kết quả cá nhân
-if 'current_tab' not in st.session_state:
-    st.session_state.current_tab = "survey"
+# Quản lý trạng thái
+if 'page' not in st.session_state:
+    st.session_state.page = "survey"
 if 'start_time' not in st.session_state:
     st.session_state.start_time = time.time()
-if 'latest_submission' not in st.session_state:
-    st.session_state.latest_submission = None
+if 'latest_user' not in st.session_state:
+    st.session_state.latest_user = None
 
-# --- 2. TẢI DỮ LIỆU CHUẨN TOÀN CẦU VÀ HUẤN LUYỆN PCA ---
+# --- 2. TẢI DỮ LIỆU NỀN TOÀN CẦU (N=3.459) & PCA ---
 @st.cache_resource
 def load_and_fit_pca():
     if os.path.exists(DATA_GLOBAL_PATH):
@@ -35,392 +74,264 @@ def load_and_fit_pca():
             np.random.uniform(1.0, 5.0, (3459, 3)),
             columns=['Burnout_Level', 'AI_Technostress', 'Cognitive_Latency_Proxy']
         )
-        
     feature_cols = ['Burnout_Level', 'AI_Technostress', 'Cognitive_Latency_Proxy']
-    X_global = df_global[feature_cols].values
-    
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_global)
-    
+    X_scaled = scaler.fit_transform(df_global[feature_cols].values)
     pca = PCA(n_components=2)
     X_2d = pca.fit_transform(X_scaled)
-    
     df_global['PC1'] = X_2d[:, 0]
     df_global['PC2'] = X_2d[:, 1]
     return df_global, scaler, pca
 
 df_global, scaler, pca = load_and_fit_pca()
 
-# --- 3. HÀM LUẬN GIẢI TÂM LÝ & KHUYẾN NGHỊ THÍCH ỨNG ---
-def get_psychological_insight(f1, f2, f3):
-    """
-    f1: Mức độ hao mòn năng lượng (Burnout)
-    f2: Áp lực nhịp độ công nghệ (Technostress)
-    f3: Tải nhận thức & rào cản phục hồi (Cognitive Latency & Deficit)
-    """
+# --- 3. ĐÁNH GIÁ TRẠNG THÁI & KHUYẾN NGHỊ THIẾT THỰC ---
+def get_status_feedback(f1, f2, f3):
     if f2 >= 3.5 and f1 >= 3.5:
-        zone = "Vùng Quá Tải Nhịp Độ Số & Hao Mòn Năng Lượng (High Technostress & Burnout Trap)"
-        meaning = (
-            "Thầy/Cô đang phải liên tục vận hành nhận thức ở cường độ cao trước sự dồn dập của các công cụ mới "
-            "song song với áp lực công việc thường nhật. Điều này làm cạn kiệt tài nguyên phục hồi tự nhiên, "
-            "dễ tạo nên cảm giác 'bị công nghệ thúc ép' và mệt mỏi tinh thần kéo dài."
-        )
-        recommendations = [
-            "**Thiết lập ranh giới số cá nhân (Digital Boundaries):** Dành khung giờ cố định ngắt kết nối với thông báo công việc/AI sau giờ làm việc.",
-            "**Kỹ thuật Vi nghỉ ngơi (Micro-breaks):** Áp dụng quy tắc 50-10 (sau 50 phút làm việc với màn hình, dành 10 phút thả lỏng mắt, hít thở sâu hoặc vận động nhẹ).",
-            "**Giảm tải kỳ vọng tức thời:** Cho phép bản thân có lộ trình thích nghi vừa sức với công nghệ mới, tránh tâm lý FOMO (sợ tụt hậu)."
+        zone = "Vùng Quá Tải Nhịp Độ Số"
+        desc = "Bạn đang phải xử lý nhiều luồng công việc số với cường độ cao, khiến năng lượng phục hồi bị suy giảm rõ rệt."
+        tips = [
+            "Tập thói quen ngắt thông báo công việc/ứng dụng sau giờ làm việc.",
+            "Nghỉ ngắn 5 phút sau mỗi 45 phút tập trung vào màn hình thiết bị.",
+            "Ưu tiên hoàn thành từng việc một, giảm bớt thói quen xử lý đa nhiệm (multitasking)."
         ]
-        color = "#DC2626"
+        color = "#e11d48"
     elif f2 >= 3.5 and f1 < 3.5:
-        zone = "Vùng Căng Thẳng Thích Nghi Kỹ Thuật Số (Techno-Adaptation Friction)"
-        meaning = (
-            "Nguồn năng lượng nền tảng của Thầy/Cô vẫn khá vững vàng, tuy nhiên nhịp độ cập nhật và vận hành công cụ số "
-            "đang tạo ra những 'ma sát nhận thức' đáng kể. Thầy/Cô có xu hướng dành nhiều nỗ lực tập trung để làm chủ hệ thống mới, "
-            "dẫn đến cảm giác căng thẳng thời điểm."
-        )
-        recommendations = [
-            "**Tối ưu hóa quy trình tiếp cận:** Chọn lọc 1-2 công cụ AI/số thiết thực nhất phục vụ trực tiếp bài giảng/nghiên cứu, tạm gác các công nghệ ngoại vi.",
-            "**Chia sẻ gánh nặng chuyên môn:** Trao đổi cùng đồng nghiệp trong bộ môn về các mẫu bài giảng/tài nguyên có sẵn để tránh phải tự tìm tòi lại từ đầu.",
-            "**Bài tập thư giãn nhận thức:** Thực hành 3-5 phút thiền buông thư hoặc hít thở điều hòa trước mỗi giờ chuyển tiếp công việc."
+        zone = "Vùng Áp Lực Thích Ứng Công Nghệ"
+        desc = "Nền tảng năng lượng của bạn còn tốt, nhưng việc làm quen liên tục với các công cụ/quy trình số mới đang tạo ra áp lực thời điểm."
+        tips = [
+            "Chỉ chọn lọc dùng 1–2 công cụ thật sự cần thiết phục vụ mục tiêu chính.",
+            "Tham khảo kinh nghiệm hoặc cách làm tắt từ đồng nghiệp để đỡ mất thời gian tự mò mẫm.",
+            "Cho bản thân thời gian thích ứng tự nhiên, không nóng vội."
         ]
-        color = "#D97706"
+        color = "#d97706"
     elif f1 >= 3.5 and f2 < 3.5:
-        zone = "Vùng Mỏi Nhận Thức Chuyên Môn & Cần Phục Hồi (Emotional & Professional Fatigue)"
-        meaning = (
-            "Áp lực từ công nghệ không phải là nguyên nhân chính, mà trạng thái mỏi mệt chủ yếu đến từ khối lượng công việc, "
-            "trách nhiệm giảng dạy, nghiên cứu tích tụ lâu ngày làm hao tổn năng lượng thần kinh."
-        )
-        recommendations = [
-            "**Tái tạo tài nguyên tâm lý:** Dành sự ưu tiên hàng đầu cho chất lượng giấc ngủ và thời gian thư giãn cá nhân.",
-            "**Sắp xếp thứ tự ưu tiên:** Phân loại nhiệm vụ theo ma trận khẩn cấp/quan trọng; chủ động ủy thác hoặc giãn tiến độ cho các đầu việc không cấp bách.",
-            "**Tìm kiếm sự đồng cảm:** Chia sẻ trạng thái hiện tại với người thân hoặc đồng nghiệp thân thiết để giải tỏa tải cảm xúc."
+        zone = "Vùng Mệt Mỏi Cần Tái Tạo"
+        desc = "Áp lực không đến nhiều từ công nghệ mà chủ yếu do khối lượng công việc và sinh hoạt dồn dập khiến cơ thể mệt mỏi."
+        tips = [
+            "Ưu tiên chất lượng giấc ngủ và thời gian thư giãn cá nhân.",
+            "Giảm bớt hoặc lùi hạn các đầu việc không cấp bách.",
+            "Dành thời gian vận động nhẹ hoặc ra ngoài hít thở không khí tự nhiên."
         ]
-        color = "#EA580C"
+        color = "#ea580c"
     else:
-        zone = "Vùng Thích Ứng Cân Bằng & Năng Lượng Ổn Định (Resilient Equilibrium)"
-        meaning = (
-            "Thầy/Cô đang duy trì được sự điều hòa rất tốt giữa nhịp độ công nghệ và nội lực tinh thần. "
-            "Khả năng thích ứng linh hoạt giúp Thầy/Cô làm chủ công cụ mà không bị cuốn vào vòng xoáy áp lực số."
-        )
-        recommendations = [
-            "**Duy trì nhịp sinh học hiện tại:** Tiếp tục giữ vững các thói quen quản lý thời gian và chăm sóc bản thân đang phát huy hiệu quả.",
-            "**Chia sẻ kinh nghiệm:** Lan tỏa cách thức cân bằng và sử dụng công nghệ hiệu quả đến các đồng nghiệp trong đơn vị.",
-            "**Tiếp tục lắng nghe bản thân:** Định kỳ tự quan sát cảm xúc để chủ động điều chỉnh khi bước vào các giai đoạn cao điểm thi cử/nghiên cứu."
+        zone = "Vùng Cân Bằng Ổn Định"
+        desc = "Bạn đang điều tiết nhịp độ rất tốt, làm chủ công cụ và duy trì năng lượng tinh thần thoải mái."
+        tips = [
+            "Tiếp tục duy trì nhịp độ làm việc và sinh hoạt khoa học hiện tại.",
+            "Sẵn sàng chia sẻ mẹo làm việc hiệu quả với các thành viên khác trong nhóm.",
+            "Lắng nghe cơ thể để chủ động điều chỉnh khi bước vào các tuần cao điểm."
         ]
-        color = "#16A34A"
-        
-    return zone, meaning, recommendations, color
-
-# --- 4. GIAO DIỆN HEADER ---
-st.title("🌱 Lắng Nghe Nhịp Độ Nhận Thức & Thích Ứng Công Nghệ")
-st.markdown(
-    "Chào mừng Quý Thầy/Cô. Không gian này được thiết kế để cùng Thầy/Cô lắng nghe nhịp độ tâm lý, "
-    "định vị mức độ dung nạp công nghệ và chia sẻ những gợi ý điều hòa năng lượng khoa học, an lành."
-)
-st.write("")
-
-# --- NÚT ĐIỀU HƯỚNG TRANG (TỰ ĐỘNG HOẶC CHỦ ĐỘNG) ---
-nav_col1, nav_col2, _ = st.columns([1.5, 2.2, 3])
-with nav_col1:
-    if st.button("📝 Điền Phiếu Khảo Sát", use_container_width=True, 
-                 type="primary" if st.session_state.current_tab == "survey" else "secondary"):
-        st.session_state.current_tab = "survey"
-        st.rerun()
-with nav_col2:
-    if st.button("📊 Xem Kết Quả Định Vị & Lời Khuyên", use_container_width=True, 
-                 type="primary" if st.session_state.current_tab == "result" else "secondary"):
-        st.session_state.current_tab = "result"
-        st.rerun()
-
-st.divider()
+        color = "#16a34a"
+    return zone, desc, tips, color
 
 # ==============================================================================
-# TRANG 1: PHIẾU KHẢO SÁT VỚI NGÔN NGỮ THÂN THIỆN
+# TRANG 1: PHIẾU KHẢO SÁT TINH GỌN (CHUNG CHO MỌI NGƯỜI)
 # ==============================================================================
-if st.session_state.current_tab == "survey":
-    st.subheader("🌿 Phiếu Chia Sẻ Cảm Nhận Trạng Thái Công Việc")
-    st.markdown(
-        "Khảo sát hoàn toàn ẩn danh, gồm **3 câu hỏi ngắn gọn**. Thầy/Cô chỉ cần lựa chọn phương án "
-        "phù hợp nhất với trải nghiệm thực tế gần đây của mình."
-    )
+if st.session_state.page == "survey":
+    st.markdown("### 🌱 Khảo Sát Nhịp Độ Làm Việc & Thích Ứng Số")
+    st.caption("3 câu hỏi trắc nghiệm nhanh • Ẩn danh • Tự động định vị vị trí")
     
-    with st.form("survey_form_vietnamese"):
-        st.markdown("##### 🏢 Thông tin Đơn vị & Vai trò Chuyên môn")
-        c_g1, c_g2 = st.columns(2)
-        with c_g1:
-            group_options = [
-                "Bộ môn Khoa học Máy tính",
-                "Bộ môn Kỹ thuật Phần mềm",
-                "Bộ môn Hệ thống Thông tin",
-                "Bộ môn Mạng & An ninh mạng",
-                "Tổ Văn phòng / Đảm bảo Chất lượng",
-                "Nhóm Nghiên cứu Trọng điểm",
-                "Khác (Tự điền tên)"
-            ]
-            sel_group = st.selectbox("Đơn vị / Bộ môn Thầy/Cô đang công tác:", group_options)
-            if sel_group == "Khác (Tự điền tên)":
-                custom_g = st.text_input("Vui lòng ghi tên đơn vị:", value="Bộ môn Khác")
-                final_group = custom_g.strip()
-            else:
-                final_group = sel_group
-                
-        with c_g2:
-            role_options = [
-                "Giảng viên cơ hữu",
-                "Giảng viên kiêm nhiệm / Nghiên cứu viên",
-                "Cán bộ Quản lý chuyên môn",
-                "Nghiên cứu sinh / Trợ giảng"
-            ]
-            sel_role = st.selectbox("Vai trò công tác:", role_options)
+    with st.form("quick_survey_form"):
+        # Gom nhóm chung chung (mặc định 'Chung', người dùng chỉ đổi nếu có nhóm riêng)
+        group_input = st.text_input(
+            "Tên nhóm hoặc Đơn vị tham gia (để trống nếu tham gia cá nhân):", 
+            value="Chung",
+            help="Dùng để gom nhóm các thành viên cùng nhóm/phòng ban với nhau"
+        ).strip()
+        if not group_input:
+            group_input = "Chung"
 
-        st.write("")
-        st.markdown("##### 💬 Cảm nhận của Thầy/Cô trong thời gian gần đây:")
-        
         # Câu 1
-        burnout_dict = {
-            "1. Hoàn toàn thư thái, tràn đầy năng lượng và hào hứng với bài giảng / đề tài": 1.0,
-            "2. Đôi lúc thấm mệt nhưng dễ dàng hồi phục sau giấc ngủ hoặc ngày nghỉ": 2.0,
-            "3. Thường xuyên thấy hao hụt năng lượng sau giờ làm việc, cần nhiều nỗ lực để bắt đầu": 3.0,
-            "4. Thường xuyên kiệt sức tinh thần, giảm sút niềm vui và sự kiên nhẫn chuyên môn": 4.0,
-            "5. Kiệt quệ trầm trọng, cảm giác quá tải kéo dài và rất khó tái tạo năng lượng": 5.0
+        q1_opts = {
+            "1. Rất thoải mái, tràn đầy năng lượng": 1.0,
+            "2. Hơi mệt mỏi nhưng hồi phục nhanh": 2.0,
+            "3. Thỉnh thoảng cạn kiệt sức sau giờ làm": 3.0,
+            "4. Thường xuyên mệt mỏi, giảm hứng thú": 4.0,
+            "5. Kiệt sức kéo dài, rất khó phục hồi": 5.0
         }
-        q1_ans = st.radio(
-            "1. Thầy/Cô cảm nhận thế nào về mức độ hồi phục và năng lượng tinh thần của mình? (Burnout Severity)",
-            options=list(burnout_dict.keys()),
-            index=2
+        q1_sel = st.radio(
+            "1. Mức độ mệt mỏi / hao mòn sức lực gần đây:",
+            options=list(q1_opts.keys()),
+            index=1
         )
-        f1_val = burnout_dict[q1_ans]
-        
+        val_f1 = q1_opts[q1_sel]
+
         # Câu 2
-        techno_dict = {
-            "1. Rất thoải mái và làm chủ tốt các công cụ số / nền tảng AI mới": 1.0,
-            "2. Thỉnh thoảng cần chút thời gian làm quen nhưng nhịp độ tiếp thu rất dễ chịu": 2.0,
-            "3. Cảm thấy nhịp độ chuyển đổi số và công cụ AI diễn ra khá dồn dập, đôi lúc thấy áp lực": 3.0,
-            "4. Thường xuyên lo âu và căng thẳng vì phải liên tục chạy theo các chuẩn công nghệ mới": 4.0,
-            "5. Rất áp lực và quá tải, có cảm giác bị công nghệ và yêu cầu số hóa 'đuổi theo' liên tục": 5.0
+        q2_opts = {
+            "1. Dễ dàng làm chủ, không thấy áp lực": 1.0,
+            "2. Thỉnh thoảng mất chút thời gian làm quen": 2.0,
+            "3. Cảm thấy nhịp độ thay đổi công nghệ khá dồn dập": 3.0,
+            "4. Thường xuyên căng thẳng vì phải chạy theo phần mềm/AI mới": 4.0,
+            "5. Quá tải, cảm giác liên tục bị công nghệ thúc ép": 5.0
         }
-        q2_ans = st.radio(
-            "2. Nhịp độ thích nghi với các công cụ công nghệ / AI mới đang tác động đến Thầy/Cô như thế nào? (Technostress)",
-            options=list(techno_dict.keys()),
+        q2_sel = st.radio(
+            "2. Áp lực phải liên tục thích nghi với công cụ số / phần mềm mới:",
+            options=list(q2_opts.keys()),
             index=2
         )
-        f2_val = techno_dict[q2_ans]
-        
+        val_f2 = q2_opts[q2_sel]
+
         # Câu 3
-        coping_dict = {
-            "1. Thầy/Cô luôn có chiến lược tự cân bằng tốt, chủ động điều tiết và giải tỏa áp lực": 1.0,
-            "2. Khả năng thích ứng khá ổn định, ít khi bị rơi vào trạng thái bế tắc hay đắn đo kéo dài": 2.0,
-            "3. Thỉnh thoảng có chút bối rối, cần nhiều thời gian suy xét và trì hoãn giải quyết công việc": 3.0,
-            "4. Thường gặp khó khăn trong việc cân bằng cảm xúc, hay trăn trở và lo âu khi xử lý việc": 4.0,
-            "5. Cảm thấy bất an, rất khó buông bỏ lo âu và gặp trở ngại lớn trong việc tự hồi phục": 5.0
+        q3_opts = {
+            "1. Rất chủ động, luôn có cách cân bằng tốt": 1.0,
+            "2. Thích ứng ổn định, ít khi bế tắc": 2.0,
+            "3. Đôi khi bối rối, cần nhiều thời gian suy nghĩ": 3.0,
+            "4. Khó cân bằng, hay đắn đo và trì hoãn giải quyết việc": 4.0,
+            "5. Rất khó khăn trong việc tự điều hòa áp lực": 5.0
         }
-        q3_ans = st.radio(
-            "3. Khi đối mặt với nhiều áp lực dồn dập, khả năng tự điều hòa và vượt qua của Thầy/Cô ra sao? (Coping & Latency)",
-            options=list(coping_dict.keys()),
-            index=2
+        q3_sel = st.radio(
+            "3. Khả năng tự điều hòa và giải tỏa khi gặp công việc dồn dập:",
+            options=list(q3_opts.keys()),
+            index=1
         )
-        f3_val = coping_dict[q3_ans]
+        val_f3 = q3_opts[q3_sel]
 
         st.write("")
-        submit_btn = st.form_submit_button("🌱 Gửi Chia Sẻ & Xem Kết Quả Định Vị Cá Nhân", use_container_width=True, type="primary")
-        
-        if submit_btn:
-            # Bấm giờ ngầm đo thời gian suy xét (Silent Latency Timer)
-            elapsed_sec = time.time() - st.session_state.start_time
-            latency_bonus = min(1.0, (elapsed_sec / 20.0))
-            final_f3 = min(5.0, f3_val + latency_bonus)
-            
-            # Ghi nhận kết quả
-            submission_record = {
-                'Burnout_Level': f1_val,
-                'AI_Technostress': f2_val,
+        btn_submit = st.form_submit_button("🚀 Gửi & Xem Định Vị Của Bạn", use_container_width=True, type="primary")
+
+        if btn_submit:
+            # Ghi nhận độ trễ phản hồi thực tế
+            elapsed = time.time() - st.session_state.start_time
+            latency_bonus = min(1.0, elapsed / 25.0)
+            final_f3 = min(5.0, val_f3 + latency_bonus)
+
+            record = {
+                'Burnout_Level': val_f1,
+                'AI_Technostress': val_f2,
                 'Cognitive_Latency_Proxy': final_f3,
-                'group_id': final_group,
-                'role': sel_role,
+                'group_id': group_input,
                 'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
             }
-            
-            # Lưu vào file CSV
+
+            # Ghi dữ liệu
             if os.path.exists(DATA_RESPONSES_PATH):
-                df_pilot = pd.read_csv(DATA_RESPONSES_PATH)
-                df_pilot = pd.concat([df_pilot, pd.DataFrame([submission_record])], ignore_index=True)
+                df_curr = pd.read_csv(DATA_RESPONSES_PATH)
+                df_curr = pd.concat([df_curr, pd.DataFrame([record])], ignore_index=True)
             else:
-                df_pilot = pd.DataFrame([submission_record])
-            df_pilot.to_csv(DATA_RESPONSES_PATH, index=False)
-            
-            # Lưu lại trạng thái cá nhân vừa nộp để hiển thị
-            st.session_state.latest_submission = submission_record
-            
-            # TỰ ĐỘNG CHUYỂN TRANG QUA TRANG KẾT QUẢ
-            st.session_state.current_tab = "result"
+                df_curr = pd.DataFrame([record])
+            df_curr.to_csv(DATA_RESPONSES_PATH, index=False)
+
+            st.session_state.latest_user = record
+            # TỰ ĐỘNG CHUYỂN TRANG
+            st.session_state.page = "result"
             st.session_state.start_time = time.time()
             st.rerun()
 
 # ==============================================================================
-# TRANG 2: KẾT QUẢ ĐỊNH VỊ ĐÔI (CÁ NHÂN & NHÓM) KÈM LUẬN GIẢI TÂM LÝ
+# TRANG 2: KẾT QUẢ ĐỊNH VỊ TRỰC QUAN & LỜI KHUYÊN
 # ==============================================================================
-elif st.session_state.current_tab == "result":
-    st.subheader("📍 Không Gian Định Vị Trạng Thái Nhận Thức & Thấu Cảm")
-    
+elif st.session_state.page == "result":
+    # Nút quay lại gọn nhẹ ở góc trên
+    c_btn1, c_btn2 = st.columns([1, 3])
+    with c_btn1:
+        if st.button("⬅️ Làm Lại", use_container_width=True):
+            st.session_state.page = "survey"
+            st.session_state.start_time = time.time()
+            st.rerun()
+
     if os.path.exists(DATA_RESPONSES_PATH):
-        df_responses = pd.read_csv(DATA_RESPONSES_PATH)
-        n_total = len(df_responses)
+        df_resp = pd.read_csv(DATA_RESPONSES_PATH)
         
-        # 1. PHẦN LUẬN GIẢI DÀNH RIÊNG CHO CÁ NHÂN (NẾU CÓ DỮ LIỆU VỪA NỘP)
-        if st.session_state.latest_submission is not None:
-            user_data = st.session_state.latest_submission
-            u_f1 = user_data['Burnout_Level']
-            u_f2 = user_data['AI_Technostress']
-            u_f3 = user_data['Cognitive_Latency_Proxy']
-            u_group = user_data['group_id']
+        # 1. HỘP GIẢI THÍCH & LỜI KHUYÊN CHO CÁ NHÂN
+        if st.session_state.latest_user:
+            u_f1 = st.session_state.latest_user['Burnout_Level']
+            u_f2 = st.session_state.latest_user['AI_Technostress']
+            u_f3 = st.session_state.latest_user['Cognitive_Latency_Proxy']
+            u_grp = st.session_state.latest_user['group_id']
             
-            # Phân tích tâm lý
-            zone_name, meaning_text, recomms, zone_color = get_psychological_insight(u_f1, u_f2, u_f3)
+            zone_title, zone_desc, tips, zone_col = get_status_feedback(u_f1, u_f2, u_f3)
             
-            st.markdown(
-                f"""
-                <div style="background-color: #F8FAFC; border-left: 6px solid {zone_color}; padding: 18px; border-radius: 8px; margin-bottom: 20px;">
-                    <h4 style="color: {zone_color}; margin-top: 0;">🎯 Định Vị Cá Nhân Của Thầy/Cô: {zone_name}</h4>
-                    <p style="font-size: 15px; color: #1E293B; line-height: 1.6;"><strong>Ý nghĩa trạng thái:</strong> {meaning_text}</p>
-                    <p style="font-size: 14.5px; color: #334155; margin-bottom: 6px;"><strong>🌱 Gợi ý điều hòa năng lượng dành riêng cho Thầy/Cô:</strong></p>
-                    <ul style="font-size: 14px; color: #334155; line-height: 1.6; margin-bottom: 0;">
-                        {''.join([f"<li>{r}</li>" for r in recomms])}
-                    </ul>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            st.markdown(f"""
+            <div class="result-box" style="border-left: 5px solid {zone_col};">
+                <h4 style="color: {zone_col}; margin: 0 0 6px 0;">🎯 Trạng thái của bạn: {zone_title}</h4>
+                <p style="color: #334155; margin-bottom: 8px;">{zone_desc}</p>
+                <strong>🌱 Gợi ý điều hòa phù hợp:</strong>
+                <ul style="margin: 4px 0 0 0; padding-left: 18px; color: #475569; font-size: 0.9rem;">
+                    {''.join([f"<li>{t}</li>" for t in tips])}
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
             
-            # Chiếu tọa độ của riêng cá nhân
-            user_scaled = scaler.transform([[u_f1, u_f2, u_f3]])
-            user_2d = pca.transform(user_scaled)[0]
+            u_scaled = scaler.transform([[u_f1, u_f2, u_f3]])
+            u_2d = pca.transform(u_scaled)[0]
         else:
-            user_2d = None
-            u_group = "Toàn thể Khoa"
-            
-        # 2. BỘ LỌC ĐỐI SÁNH THEO NHÓM
-        st.markdown("##### 👥 Không Gian Đối Sánh Tương Quan (Cá Nhân - Nhóm - Chuẩn Toàn Cầu)")
-        col_sel, col_stat = st.columns([2, 1])
+            u_2d = None
+            u_grp = "Chung"
+
+        # 2. XỬ LÝ DỮ LIỆU NHÓM
+        available_groups = ["Tất cả nhóm"] + sorted(list(df_resp['group_id'].dropna().unique()))
+        sel_idx = available_groups.index(u_grp) if u_grp in available_groups else 0
         
-        groups_list = ["Toàn thể Khoa (Tất cả phản hồi)"] + sorted(list(df_responses['group_id'].dropna().unique()))
+        col_g_sel, col_cnt = st.columns([2.5, 1.5])
+        with col_g_sel:
+            chosen_grp = st.selectbox("Xem dữ liệu nhóm:", available_groups, index=sel_idx)
         
-        # Mặc định chọn nhóm của người vừa nộp nếu có
-        default_index = 0
-        if st.session_state.latest_submission is not None and u_group in groups_list:
-            default_index = groups_list.index(u_group)
-            
-        with col_sel:
-            selected_group = st.selectbox("Chọn Nhóm / Bộ môn để xem định vị tương quan:", groups_list, index=default_index)
-            
-        if selected_group == "Toàn thể Khoa (Tất cả phản hồi)":
-            df_curr_group = df_responses
-            display_group_name = "Toàn thể Khoa"
+        if chosen_grp == "Tất cả nhóm":
+            df_plot = df_resp
+            grp_name = "Tất cả thành viên"
         else:
-            df_curr_group = df_responses[df_responses['group_id'] == selected_group]
-            display_group_name = selected_group
+            df_plot = df_resp[df_resp['group_id'] == chosen_grp]
+            grp_name = chosen_grp
             
-        n_group = len(df_curr_group)
-        with col_stat:
-            st.metric(f"Số lượng thành viên ({display_group_name})", f"{n_group} Thầy/Cô")
-            
-        # Chiếu tọa độ các thành viên trong nhóm
-        group_scaled = scaler.transform(df_curr_group[['Burnout_Level', 'AI_Technostress', 'Cognitive_Latency_Proxy']].values)
-        group_2d = pca.transform(group_scaled)
-        
-        # 3. VẼ BIỂU ĐỒ TRỰC QUAN HỌC THUẬT (2-LEVEL POSITIONING)
-        plt.rcParams['font.family'] = 'serif'
-        fig, ax = plt.subplots(figsize=(12, 7.5), dpi=250)
-        
-        # Lớp nền: 3 bộ dữ liệu chuẩn toàn cầu (N=3.459)
+        with col_cnt:
+            st.metric("Số mẫu nhóm", f"{len(df_plot)} người")
+
+        # 3. VẼ BẢN ĐỒ TÔ-PÔ THU GỌN (VỪA VẶN MÀN HÌNH ĐIỆN THOẠI & LAPTOP)
+        sample_scaled = scaler.transform(df_plot[['Burnout_Level', 'AI_Technostress', 'Cognitive_Latency_Proxy']].values)
+        sample_2d = pca.transform(sample_scaled)
+
+        plt.rcParams['font.family'] = 'sans-serif'
+        fig, ax = plt.subplots(figsize=(7.5, 5.0), dpi=180)  # Kích thước chuẩn, không chiếm quá nhiều diện tích dọc
+
+        # Dữ liệu nền đa miền
         slices = [
-            ('Chuẩn Doanh nghiệp CNTT Toàn cầu (OSMI Tech, N=1,259)', slice(0, 1259), '#0084FF', '#0056b3'),
-            ('Chuẩn Áp lực Học thuật Đại học (Academic Stress, N=1,100)', slice(1259, 2359), '#00C853', '#007E33'),
-            ('Chuẩn Giáo dục Bậc cao Quốc tế (Higher Ed Wellbeing, N=1,100)', slice(2359, 3459), '#AA00FF', '#6A0080')
+            ('Chuẩn Doanh nghiệp Công nghệ (N=1259)', slice(0, 1259), '#38bdf8'),
+            ('Chuẩn Học thuật & Đào tạo (N=1100)', slice(1259, 2359), '#4ade80'),
+            ('Chuẩn Giáo dục Bậc cao (N=1100)', slice(2359, 3459), '#c084fc')
         ]
-        for s_name, s_idx, col, edge in slices:
+        for s_title, s_idx, s_c in slices:
             sub = df_global.iloc[s_idx]
-            ax.scatter(sub['PC1'], sub['PC2'], c=col, edgecolors=edge, alpha=0.25, s=24, label=s_name)
-            
-        # Lớp 2: Các thành viên trong nhóm (Màu đỏ cam)
-        ax.scatter(
-            group_2d[:, 0], group_2d[:, 1],
-            c='#FF1744', edgecolors='black', linewidth=0.8,
-            s=85, alpha=0.90, zorder=5,
-            label=f'Thành viên {display_group_name} (n={n_group})'
-        )
-        
-        # Lớp 3: Tâm trạng thái của nhóm (Ngôi sao vàng)
-        if n_group > 0:
-            center_group = group_2d.mean(axis=0)
-            ax.scatter(
-                center_group[0], center_group[1],
-                c='#FFD600', marker='*', s=450, edgecolors='black', linewidth=1.5,
-                zorder=6, label=f'Tâm trạng thái Nhóm: {display_group_name}'
-            )
-            # Vòng tròn bao phương sai nhóm
-            circle = plt.Circle(
-                (center_group[0], center_group[1]), 0.95,
-                color='#D50000', fill=False, linestyle='--', linewidth=2.0,
-                zorder=5, label='Vùng dao động tập trung của Nhóm'
-            )
+            ax.scatter(sub['PC1'], sub['PC2'], c=s_c, alpha=0.18, s=16, label=s_title)
+
+        # Các thành viên trong nhóm
+        ax.scatter(sample_2d[:, 0], sample_2d[:, 1], c='#f43f5e', edgecolors='black', linewidth=0.6,
+                   s=55, alpha=0.9, zorder=5, label=f'Thành viên {grp_name}')
+
+        # Tâm trung bình của nhóm
+        if len(sample_2d) > 0:
+            c_grp = sample_2d.mean(axis=0)
+            ax.scatter(c_grp[0], c_grp[1], c='#fbbf24', marker='*', s=260, edgecolors='black', linewidth=1.2,
+                       zorder=6, label=f'Tâm nhóm: {grp_name}')
+            circle = plt.Circle((c_grp[0], c_grp[1]), 0.95, color='#f43f5e', fill=False, linestyle='--', linewidth=1.5, zorder=5)
             ax.add_patch(circle)
-            
-        # Lớp 4: ĐỊNH VỊ CÁ NHÂN (Vòng tròn Xanh Neon rực rỡ)
-        if user_2d is not None:
-            ax.scatter(
-                user_2d[0], user_2d[1],
-                c='#00E5FF', marker='o', s=260, edgecolors='#004D40', linewidth=2.2,
-                zorder=7, label='📍 VỊ TRÍ CỦA THẦY/CÔ (Cá Nhân Bản Thân)'
-            )
-            # Chú thích mũi tên trỏ vào cá nhân
-            ax.annotate(
-                "Bạn ở đây!", xy=(user_2d[0], user_2d[1]), xytext=(user_2d[0] + 0.45, user_2d[1] + 0.45),
-                arrowprops=dict(facecolor='#00E5FF', edgecolor='black', arrowstyle="->", lw=1.5),
-                fontsize=10.5, fontweight='bold', color="#004D40",
-                bbox=dict(boxstyle="round,pad=0.2", fc="#E0F7FA", ec="#00ACC1", lw=1.0),
-                zorder=8
-            )
-            
-        ax.set_title("Bản Đồ Không Gian Trạng Thái Tô-pô Đa Miền: Cá Nhân vs. Nhóm vs. Chuẩn Toàn Cầu", 
-                     fontsize=12.5, fontweight='bold', pad=14)
-        ax.set_xlabel(f"Trục Tọa độ Nhận thức 1 (PC1 - {pca.explained_variance_ratio_[0]*100:.1f}% Phương sai)", fontsize=10.5)
-        ax.set_ylabel(f"Trục Tọa độ Nhận thức 2 (PC2 - {pca.explained_variance_ratio_[1]*100:.1f}% Phương sai)", fontsize=10.5)
-        ax.legend(loc="upper left", frameon=True, framealpha=0.92, facecolor='white', fontsize=8.8)
-        ax.grid(True, linestyle=':', alpha=0.5)
+
+        # Vị trí cá nhân (Xanh Neon nổi bật)
+        if u_2d is not None:
+            ax.scatter(u_2d[0], u_2d[1], c='#06b6d4', marker='o', s=160, edgecolors='#083344', linewidth=2.0,
+                       zorder=7, label='📍 Vị trí của bạn')
+            ax.annotate("Bạn ở đây", xy=(u_2d[0], u_2d[1]), xytext=(u_2d[0] + 0.35, u_2d[1] + 0.35),
+                        arrowprops=dict(facecolor='#06b6d4', edgecolor='black', arrowstyle="->", lw=1.2),
+                        fontsize=8.5, fontweight='bold', color="#083344",
+                        bbox=dict(boxstyle="round,pad=0.15", fc="#cffafe", ec="#06b6d4", lw=0.8), zorder=8)
+
+        ax.set_title("Bản Đồ Không Gian Trạng Thái Thích Ứng", fontsize=10.5, fontweight='bold', pad=8)
+        ax.set_xlabel(f"Trục thích ứng 1 ({pca.explained_variance_ratio_[0]*100:.1f}%)", fontsize=8.5)
+        ax.set_ylabel(f"Trục thích ứng 2 ({pca.explained_variance_ratio_[1]*100:.1f}%)", fontsize=8.5)
+        ax.tick_params(labelsize=8)
+        ax.legend(loc="upper left", framealpha=0.9, fontsize=7.2)
+        ax.grid(True, linestyle=':', alpha=0.4)
         plt.tight_layout()
-        
         st.pyplot(fig)
-        
-        # 4. CHỈ SỐ SO SÁNH THỰC TẾ
-        st.write("")
-        st.markdown("##### 📊 Chỉ Số So Sánh Trung Bình Giữa Các Mức Độ")
-        c1, c2, c3 = st.columns(3)
-        
-        m_b = df_curr_group['Burnout_Level'].mean()
-        m_t = df_curr_group['AI_Technostress'].mean()
-        m_c = df_curr_group['Cognitive_Latency_Proxy'].mean()
-        
+
+        # 4. CHỈ SỐ SO SÁNH GỌN GÀNG (3 CỘT)
+        m_b = df_plot['Burnout_Level'].mean()
+        m_t = df_plot['AI_Technostress'].mean()
         g_b = df_global['Burnout_Level'].mean()
         g_t = df_global['AI_Technostress'].mean()
-        g_c = df_global['Cognitive_Latency_Proxy'].mean()
-        
-        c1.metric("Mức Hao Mòn Năng Lượng (Burnout)", f"{m_b:.2f} / 5.0", delta=f"{m_b - g_b:+.2f} so với Toàn cầu")
-        c2.metric("Áp Lực Thích Ứng Công Nghệ (Technostress)", f"{m_t:.2f} / 5.0", delta=f"{m_t - g_t:+.2f} so với Toàn cầu")
-        c3.metric("Độ Trễ Nhận Thức (Cognitive Latency)", f"{m_c:.2f} / 5.0", delta=f"{m_c - g_c:+.2f} so với Toàn cầu")
-        
-        # 5. KHUYẾN NGHỊ DÀNH CHO CẤP ĐỘ NHÓM / BỘ MÔN (POLICY RECOMMENDATIONS)
-        with st.expander(f"🏛️ Khuyến nghị điều hòa nhịp độ công việc cho cấp Đơn vị / {display_group_name}"):
-            st.markdown(
-                f"""
-                - **Chỉ số Technostress trung bình của nhóm ({m_t:.2f}/5.0):** 
-                  Nếu cao hơn chuẩn toàn cầu, đơn vị nên xem xét tổ chức các buổi chia sẻ 'Best Practice' nội bộ 
-                  để các giảng viên có thế mạnh công nghệ hỗ trợ kèm cặp đồng nghiệp, giảm áp lực tự mày mò đơn độc.
-                - **Chỉ số Burnout trung bình ({m_b:.2f}/5.0):** 
-                  Nếu ở mức trên 3.5, đơn vị cần linh hoạt trong phân bổ hạn ngạch nhiệm vụ, ưu tiên giảm bớt các thủ tục hành chính số hóa rườm rà.
-                - **Bảo toàn tính đa dạng nhận thức:** 
-                  Vòng dao động của nhóm phản ánh sự gắn kết nhưng cũng có sự phân hóa giữa các độ tuổi và thâm niên; 
-                  cần lắng nghe và tôn trọng nhịp độ thích nghi riêng của từng cá nhân.
-                """
-            )
+
+        col1, col2 = st.columns(2)
+        col1.metric("Mức mệt mỏi trung bình", f"{m_b:.2f} / 5.0", delta=f"{m_b - g_b:+.2f} so với chuẩn chung")
+        col2.metric("Áp lực công nghệ trung bình", f"{m_t:.2f} / 5.0", delta=f"{m_t - g_t:+.2f} so với chuẩn chung")
     else:
-        st.warning("🌱 Hiện tại chưa có dữ liệu phản hồi nào. Mời Thầy/Cô bấm nút 'Điền Phiếu Khảo Sát' ở phía trên để bắt đầu trải nghiệm.")
+        st.info("Chưa có dữ liệu nào. Vui lòng quay lại điền phiếu.")
